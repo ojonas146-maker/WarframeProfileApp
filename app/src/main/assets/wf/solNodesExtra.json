@@ -1,0 +1,26 @@
+{
+  "SolNode239": {
+    "name": "/Lotus/Language/Locations/RelayStationVenus",
+    "systemIndex": 1,
+    "systemName": "/Lotus/Language/Locations/Venus",
+    "nodeType": 0,
+    "masteryReq": 0,
+    "missionType": "MT_PAINT_FLOOD",
+    "missionName": "/Lotus/Language/Missions/MissionName_PaintFlood",
+    "faction": "FC_TENNO",
+    "minEnemyLevel": 35,
+    "maxEnemyLevel": 45
+  },
+  "SolNode902": {
+    "name": "/Lotus/Language/Locations/VenusArchwingNode1",
+    "systemIndex": 1,
+    "systemName": "/Lotus/Language/Locations/Venus",
+    "nodeType": 0,
+    "masteryReq": 0,
+    "missionType": "MT_EXTERMINATION",
+    "missionName": "/Lotus/Language/Missions/MissionName_Exterminate",
+    "faction": "FC_CORPUS",
+    "minEnemyLevel": 3,
+    "maxEnemyLevel": 8
+  }
+}

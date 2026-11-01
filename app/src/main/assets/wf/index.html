@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0d13">
+<title>Warframe Profile</title>
+<link rel="stylesheet" href="style.css?v=2026.11.01-app1">
+</head>
+<body>
+<!-- gradientes dos Archon Shards (definidos uma vez, usados por todos os ícones) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs id="shard-defs"></defs>
+</svg>
+
+<div class="app">
+  <aside class="side">
+    <div class="brand"><span class="brand-mark">◈</span><span class="brand-txt">WARFRAME<small>PROFILE</small></span></div>
+    <nav id="nav" class="nav"></nav>
+  </aside>
+  <main class="main">
+    <div id="userbar"></div>
+    <div id="banner"></div>
+    <div id="view" class="view"></div>
+  </main>
+</div>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true">
+    <button class="modal-x" id="modal-x" aria-label="Fechar">✕</button>
+    <div id="modal-body"></div>
+  </div>
+</div>
+<script src="app.js?v=2026.11.01-app1"></script>
+</body>
+</html>

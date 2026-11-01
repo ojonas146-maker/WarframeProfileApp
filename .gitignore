@@ -1,0 +1,13 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+*.apk
+__pycache__/
+# dados pessoais: nunca suba
+lastData*
+data/users/
+data/accounts.json
+data/sessions.json
+data/config.json
