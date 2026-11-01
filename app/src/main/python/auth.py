@@ -337,22 +337,45 @@ def _key_iv():
 def _aes_cbc_decrypt(key, iv, data):
     if len(data) % 16:
         raise AuthError("O arquivo não parece um lastData.dat (tamanho inválido).")
+    errs = []
+    # 1) Android: AES nativo do sistema (Java), não depende de biblioteca extra
+    try:
+        from java import jclass
+        Cipher = jclass("javax.crypto.Cipher")
+        SecretKeySpec = jclass("javax.crypto.spec.SecretKeySpec")
+        IvParameterSpec = jclass("javax.crypto.spec.IvParameterSpec")
+        c = Cipher.getInstance("AES/CBC/PKCS5Padding")
+        c.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), IvParameterSpec(iv))
+        return bytes(c.doFinal(data))
+    except ImportError:
+        pass
+    except Exception as e:
+        errs.append("java: %s" % e)
+    # 2) PC/Termux: pycryptodome
     try:
         from Crypto.Cipher import AES
         from Crypto.Util.Padding import unpad
         return unpad(AES.new(key, AES.MODE_CBC, iv).decrypt(data), 16)
     except ImportError:
         pass
+    except Exception as e:
+        errs.append("pycryptodome: %s" % e)
+    # 3) cryptography
     try:
         from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+        dec = Cipher(algorithms.AES(key), modes.CBC(iv)).decryptor()
+        raw = dec.update(data) + dec.finalize()
+        pad = raw[-1] if raw else 0
+        if not 1 <= pad <= 16:
+            raise ValueError("padding inválido")
+        return raw[:-pad]
     except ImportError:
-        raise AuthError("Falta a biblioteca de criptografia no servidor: python3 -m pip install pycryptodome", 500)
-    dec = Cipher(algorithms.AES(key), modes.CBC(iv)).decryptor()
-    raw = dec.update(data) + dec.finalize()
-    pad = raw[-1] if raw else 0
-    if not 1 <= pad <= 16:
-        raise ValueError("padding inválido")
-    return raw[:-pad]
+        pass
+    except Exception as e:
+        errs.append("cryptography: %s" % e)
+    if errs:
+        raise ValueError("; ".join(errs))
+    raise AuthError("Falta a biblioteca de criptografia no servidor: python3 -m pip install pycryptodome", 500)
 
 
 def decrypt_lastdata(blob):
@@ -366,8 +389,9 @@ def decrypt_lastdata(blob):
                 data = json.loads(_aes_cbc_decrypt(key, iv, blob).decode("utf-8"))
             except AuthError:
                 raise
-            except Exception:
-                raise AuthError("Não consegui descriptografar. Esse é mesmo o lastData.dat do AlecaFrame?")
+            except Exception as e:
+                import traceback; traceback.print_exc()
+                raise AuthError("Não consegui descriptografar (%s: %s). Esse é mesmo o lastData.dat do AlecaFrame?" % (type(e).__name__, str(e)[:200]))
         if isinstance(data, dict) and "InventoryJson" in data:  # arquivos antigos vinham encapsulados
             data = json.loads(data["InventoryJson"])
     except AuthError:
