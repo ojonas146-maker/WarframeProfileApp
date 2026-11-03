@@ -6,6 +6,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 import market
+import effects, rivens, wfmacct
 import auth
 from http.cookies import SimpleCookie
 
@@ -1121,6 +1122,11 @@ class H(SimpleHTTPRequestHandler):
                     return self.send_json({"error": "Senha incorreta."}, 401)
                 auth.delete_account(sess["key"])
                 return self.send_json({"ok": True}, headers=[("Set-Cookie", "wfsid=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax")])
+            if u.path.startswith("/api/wfm/"):
+                try:
+                    return self.send_json(wfmacct.handle_post(u.path, j))
+                except wfmacct.WfmError as e:
+                    return self.send_json({"error": str(e)}, e.code)
             self.send_json({"error": "rota invalida"}, 404)
         except auth.AuthError as e:
             self.send_json({"error": str(e)}, e.code)
@@ -1189,12 +1195,22 @@ class H(SimpleHTTPRequestHandler):
                     return self.send_json(missions_api(pv_res(pid)))
             except Exception as e:
                 return self.send_json({"error": str(e)}, 502)
+        if u.path.startswith("/api/wfm/"):
+            try:
+                return self.send_json(wfmacct.handle_get(u.path, q))
+            except wfmacct.WfmError as e:
+                return self.send_json({"error": str(e)}, e.code)
+        if u.path == "/api/effects":
+            e, st = effects.get(q.get("p", [""])[0])
+            return self.send_json({"status": st, "e": e})
         try:
             d = self._data(sess)
             if d is None:
                 return self.send_json({"error": "nodata"}, 409)
             if u.path == "/api/summary":
                 return self.send_json(summary(d))
+            if u.path == "/api/rivens":
+                return self.send_json(rivens.decode(d, (catalog() or {}).get("items", {}), icon_of))
             cat = q.get("cat", [""])[0]
             if u.path == "/api/items" and cat in ITEM_CATS:
                 return self.send_json(list_items(d, cat))

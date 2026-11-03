@@ -8,6 +8,7 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.view.ViewGroup
+import android.webkit.JavascriptInterface
 import android.webkit.JsResult
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -31,6 +32,7 @@ class MainActivity : Activity() {
 
     private companion object {
         const val REQ_FILE = 1001
+        const val REQ_WFM = 1002
         // arquivos que só entram na 1ª instalação (depois são atualizados pelo próprio servidor)
         val SEED_ONLY = setOf("data/market_index.json", "data/keys.json")
         var port = 0
@@ -89,6 +91,7 @@ class MainActivity : Activity() {
                 }
             }
         }
+        web.addJavascriptInterface(Bridge(), "Android")
         status = TextView(this).apply {
             text = "Iniciando…"; setTextColor(Color.parseColor("#9AA4B2")); textSize = 16f
             gravity = android.view.Gravity.CENTER
@@ -147,8 +150,23 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Ponte JS -> Android (só a página local do app enxerga). */
+    inner class Bridge {
+        @JavascriptInterface
+        fun loginWfm() {
+            runOnUiThread { startActivityForResult(Intent(this@MainActivity, WfmLoginActivity::class.java), REQ_WFM) }
+        }
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == REQ_WFM) {
+            val tok = if (resultCode == RESULT_OK) data?.getStringExtra("token") else null
+            if (!tok.isNullOrEmpty()) {
+                web.evaluateJavascript("window.onWfmToken&&window.onWfmToken(" + org.json.JSONObject.quote(tok) + ")", null)
+            }
+            return
+        }
         if (requestCode == REQ_FILE) {
             fileCallback?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data))
             fileCallback = null

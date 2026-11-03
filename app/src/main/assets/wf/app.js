@@ -67,6 +67,8 @@ const NAV = [
   ["reliquias", "Relíquias", '<path d="M12 2l8 4.5v9L12 20l-8-4.5v-9z"/><path d="M12 8v6"/>'],
   ["formas", "Formas", '<path d="M12 2l3 7 7 1-5 5 1 7-6-4-6 4 1-7-5-5 7-1z"/>'],
   ["inventario", "Inventário", '<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>'],
+  ["rivens", "Rivens", '<path d="M5 3h14v18H5z"/><path d="M9 8h6M9 12h6M9 16h4"/>'],
+  ["mercado", "Mercado", '<path d="M3 9l2-5h14l2 5"/><path d="M4 9v11h16V9"/><path d="M9 20v-6h6v6"/>'],
   ["sindicatos", "Sindicatos", '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-4 3-6 6-6s6 2 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14c3 0 5 2 5 5"/>'],
   ["missoes", "Missões", '<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>'],
 ];
@@ -570,7 +572,11 @@ VIEWS.inventario = async el => {
   $("#q").oninput = debounce(e => { q = e.target.value.trim().toLowerCase(); shown = 60; draw(); });
   $("#sort").onchange = e => { sort = e.target.value; draw(); };
   $("#pills").onclick = e => { const p = e.target.closest("[data-p]"); if (!p) return; const f = p.dataset.p; only.has(f) ? only.delete(f) : only.add(f); $$("#pills .pill").forEach(x => x.classList.toggle("on", only.has(x.dataset.p))); shown = 60; draw(); };
-  $("#list").onclick = e => { const r = e.target.closest(".irow.set"); if (!r) return; const x = filtered[+r.dataset.i]; open.has(x.path) ? open.delete(x.path) : open.add(x.path); draw(); };
+  $("#list").onclick = e => {
+    const r = e.target.closest(".irow"); if (!r) return; const x = filtered[+r.dataset.i]; if (!x) return;
+    if (x.parts) { open.has(x.path) ? open.delete(x.path) : open.add(x.path); draw(); return; }
+    if ((cat === "mods" || cat === "arcanes") && x.path) showFx(x, cat === "arcanes");
+  };
   await load();
 };
 
@@ -718,3 +724,125 @@ boot();
   } catch { msg = "servidor antigo em execução — feche o app e abra de novo."; }
   if (msg) { const d = document.createElement("div"); d.className = "banner"; d.style.cssText = "position:fixed;left:8px;right:8px;bottom:8px;z-index:99"; d.textContent = msg; d.onclick = () => d.remove(); document.body.appendChild(d); }
 })();
+
+/* ================================================================ helpers novos */
+const jf = async u => { const r = await fetch(u, { cache: "no-store" }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "Erro " + r.status); return j; };
+const br = t => esc(t).replace(/\n/g, "<br>");
+
+/* ---- efeitos de mods / arcanos (detalhe ao tocar no item do inventário) */
+async function showFx(x, arc) {
+  openModal(`<div class="m-head">${ico(x.icon, x.name)}<div><h2 style="font-size:21px">${esc(x.name)}</h2><div class="mut" id="fxm"></div></div></div><div id="fxb" class="fx"><div class="empty">Carregando efeitos…</div></div>`);
+  for (let i = 0; i < 60; i++) {
+    let r; try { r = await jf("/api/effects?p=" + encodeURIComponent(x.path)); } catch (e) { if ($("#fxb")) $("#fxb").innerHTML = `<div class="mkerr">${esc(e.message)}</div>`; return; }
+    if (!$("#fxb")) return;
+    if (r.status === "building") { $("#fxb").innerHTML = '<div class="empty">Baixando os dados de efeitos (só na primeira vez)…</div>'; await sleep(2000); continue; }
+    if (String(r.status).startsWith("error:")) { $("#fxb").innerHTML = `<div class="mkerr">${esc(r.status.slice(6))}</div>`; return; }
+    if (!r.e) { $("#fxb").innerHTML = '<div class="empty">Sem dados de efeito para este item.</div>'; return; }
+    const e = r.e, S = (e.s || []).filter(Boolean), pol = e.p ? String(e.p).replace("AP_", "").toLowerCase() : "";
+    $("#fxm").innerHTML = [e.r, e.t, pol, e.d != null ? "dreno " + e.d : ""].filter(Boolean).map(v => `<span class="chip">${esc(v)}</span>`).join(" ");
+    const lv = (t, i) => `<div class="fxr"><b>Rank ${i}</b><div>${br(t)}</div></div>`;
+    let h = "";
+    if (e.x && e.x.length && !arc) h += `<div class="fxd">${br(e.x.join("\n"))}</div>`;
+    if (!S.length) h += e.x && e.x.length ? "" : '<div class="empty">Sem detalhes por rank.</div>';
+    else if (arc) h += S.map((t, i) => lv(t, i + 1)).join("");
+    else h += `<div class="fxr max"><b>Rank máx (${S.length - 1})</b><div>${br(S[S.length - 1])}</div></div><details class="fxall"><summary>Ver todos os ranks</summary>${S.map((t, i) => lv(t, i)).join("")}</details>`;
+    $("#fxb").innerHTML = h; return;
+  }
+}
+
+/* ================================================================ RIVENS */
+VIEWS.rivens = async el => {
+  const L = await jf("/api/rivens");
+  let q = "", fam = "", sort = "rerolls", shown = 40;
+  const FN = { rifle: "Rifle", pistol: "Pistola", shotgun: "Shotgun", melee: "Melee", arch: "Arch-gun" }, fams = [...new Set(L.map(r => r.fam))];
+  el.innerHTML = `${head("Rivens", `${fmt(L.length)} rivens no seu lastData · valores no rank atual e no máximo`)}
+    <div class="tabs" id="rf"><span class="pill on" data-f="">Todos</span>${fams.map(f => `<span class="pill" data-f="${f}">${FN[f] || f}</span>`).join("")}</div>
+    <div class="tools"><input class="inp search" id="rq" placeholder="Buscar arma ou nome…" autocomplete="off"><select class="inp" id="rs"><option value="rerolls">Mais rerolls</option><option value="avg">Melhor rolagem</option><option value="mr">Maestria</option><option value="name">Nome</option></select></div>
+    <div class="count" id="rc"></div><div class="grid rivs" id="rl"></div><div id="rm"></div>
+    <div class="mut" style="font-size:12px;margin-top:12px">Valores calculados pela rolagem de cada Riven (disposição 1.2 quando a do warframe.market ainda não foi baixada). Armas que não são rifle usam tabelas aproximadas (≈).</div>`;
+  const card = r => `<div class="riv"><div class="rv-h"><span class="rv-d">${r.drain}</span><span class="rv-n">${esc(r.name)}</span></div>
+    <div class="rv-s">${r.stats.map(s => `<div class="${s.neg ? "neg" : "pos"}">${esc(s.cur)} ${esc(s.label)}${s.max !== s.cur ? ` <small>(máx ${esc(s.max)})</small>` : ""} <small class="q">${s.q}%</small></div>`).join("")}</div>
+    <div class="rv-f"><span>MR ${r.mr}</span><span>R${r.rank}/8</span><span>↻ ${fmt(r.rerolls)}</span><span class="chip">${esc(r.pol)}</span><span class="chip ${r.avg >= 70 ? "ok" : ""}">rolagem ${r.avg}%</span>${r.approx ? '<span class="chip">≈</span>' : ""}</div></div>`;
+  const draw = () => {
+    let A = L.filter(r => (!fam || r.fam === fam) && (!q || r.name.toLowerCase().includes(q)));
+    const K = { rerolls: (a, b) => b.rerolls - a.rerolls, avg: (a, b) => b.avg - a.avg, mr: (a, b) => b.mr - a.mr, name: (a, b) => a.name.localeCompare(b.name) };
+    A.sort((a, b) => K[sort](a, b) || a.name.localeCompare(b.name));
+    $("#rc").textContent = `${fmt(A.length)} de ${fmt(L.length)} rivens`;
+    $("#rl").innerHTML = A.slice(0, shown).map(card).join("") || '<div class="empty">Nenhum Riven.</div>';
+    $("#rm").innerHTML = A.length > shown ? `<button class="more" id="rmb">Mostrar mais (${fmt(A.length - shown)})</button>` : "";
+    const b = $("#rmb"); if (b) b.onclick = () => { shown += 40; draw(); };
+  };
+  $("#rf").onclick = e => { const t = e.target.closest(".pill"); if (!t) return; fam = t.dataset.f; $$("#rf .pill").forEach(x => x.classList.toggle("on", x === t)); shown = 40; draw(); };
+  $("#rq").oninput = e => { q = e.target.value.trim().toLowerCase(); shown = 40; draw(); };
+  $("#rs").onchange = e => { sort = e.target.value; draw(); };
+  draw();
+};
+
+/* ================================================================ MERCADO (conta do warframe.market) */
+window.onWfmToken = async tok => {
+  try { await post("/api/wfm/token", { token: tok }); } catch (e) { alert(e.message); }
+  if (location.hash === "#/mercado") route(); else location.hash = "#/mercado";
+};
+VIEWS.mercado = async el => {
+  let st; try { st = await jf("/api/wfm/status"); } catch (e) { st = { logged: false, error: e.message }; }
+  if (!st.logged) {
+    el.innerHTML = `${head("Mercado", "Entre na sua conta do warframe.market para ver, anunciar e remover suas ordens")}
+      <div class="mbox">${st.error ? `<div class="mkerr">${esc(st.error)}</div>` : ""}
+      ${window.Android ? '<button class="more" id="mweb">Entrar pelo site do warframe.market</button><div class="mut" style="font-size:12px;margin:6px 0 14px">Abre o login oficial do site (funciona com qualquer forma de login). A senha nunca passa pelo app; só a sessão fica guardada neste aparelho.</div>' : ""}
+      <details><summary class="pill">Entrar com e-mail e senha</summary><div class="mform"><input class="inp" id="me" type="email" placeholder="E-mail" autocomplete="off"><input class="inp" id="mp" type="password" placeholder="Senha" autocomplete="off"><button class="more" id="mlogin">Entrar</button></div></details>
+      <details style="margin-top:8px"><summary class="pill">Colar token (JWT)</summary><div class="mform"><textarea class="inp" id="mt" rows="3" placeholder="Cole aqui o valor do cookie JWT"></textarea><button class="more" id="mtok">Usar token</button></div></details>
+      <div class="mkerr" id="merr" hidden></div></div>`;
+    const fail = e => { const b = $("#merr"); b.textContent = e.message; b.hidden = false; };
+    const go = async (path, body) => { try { await post(path, body); route(); } catch (e) { fail(e); } };
+    if ($("#mweb")) $("#mweb").onclick = () => window.Android.loginWfm();
+    $("#mlogin").onclick = () => go("/api/wfm/login", { email: $("#me").value, password: $("#mp").value });
+    $("#mtok").onclick = () => go("/api/wfm/token", { token: $("#mt").value });
+    return;
+  }
+  el.innerHTML = `${head("Mercado", `Logado como <b>${esc(st.user.name)}</b>`)}
+    <div class="tools"><button class="pill" id="mnew">+ Novo anúncio</button><button class="pill" id="mref">Atualizar</button><button class="pill" id="mout">Sair</button></div>
+    <div id="mform"></div><div class="mkerr" id="merr" hidden></div><div class="list" id="mlist"><div class="empty">Carregando…</div></div>`;
+  const fail = e => { if (e.message.includes("expirada")) return route(); const b = $("#merr"); b.textContent = e.message; b.hidden = false; };
+  let O = [];
+  const load = async () => {
+    try { O = await jf("/api/wfm/orders"); } catch (e) { $("#mlist").innerHTML = ""; return fail(e); }
+    $("#merr").hidden = true;
+    const row = o => `<div class="row mo ${o.visible ? "" : "hid"}" data-id="${o.id}">${ico(o.icon, o.name)}<span class="t"><span class="nm">${esc(o.name)}${o.rank != null && o.max ? ` <span class="chip gold">R${o.rank}/${o.max}</span>` : ""} <span class="chip ${o.type === "sell" ? "ok" : ""}">${o.type === "sell" ? "vende" : "compra"}</span></span>
+      <small class="mut">${fmt(o.platinum)}p × ${o.quantity}${o.visible ? "" : " · oculto"}</small>
+      <span class="mact"><input class="inp mp" type="number" min="1" value="${o.platinum}"><button class="pill" data-a="save">Salvar preço</button><button class="pill" data-a="vis">${o.visible ? "Ocultar" : "Mostrar"}</button><button class="pill danger" data-a="del">Remover</button></span></span></div>`;
+    const sells = O.filter(o => o.type === "sell"), buys = O.filter(o => o.type !== "sell");
+    $("#mlist").innerHTML = (O.length ? "" : '<div class="empty">Nenhuma ordem ativa.</div>') +
+      (sells.length ? `<div class="sec"><h2>Vendendo (${sells.length})</h2></div>${sells.map(row).join("")}` : "") + (buys.length ? `<div class="sec"><h2>Comprando (${buys.length})</h2></div>${buys.map(row).join("")}` : "");
+  };
+  $("#mlist").onclick = async e => {
+    const b = e.target.closest("button[data-a]"); if (!b) return; const r = b.closest(".mo"), o = O.find(x => x.id === r.dataset.id); if (!o) return;
+    try {
+      if (b.dataset.a === "save") await post("/api/wfm/order/update", { id: o.id, platinum: +r.querySelector(".mp").value });
+      else if (b.dataset.a === "vis") await post("/api/wfm/order/update", { id: o.id, visible: !o.visible });
+      else if (b.dataset.a === "del") { if (!confirm(`Remover "${o.name}" do warframe.market?`)) return; await post("/api/wfm/order/delete", { id: o.id }); }
+      await load();
+    } catch (er) { fail(er); }
+  };
+  $("#mref").onclick = load;
+  $("#mout").onclick = async () => { await post("/api/wfm/logout").catch(() => {}); route(); };
+  $("#mnew").onclick = () => {
+    const f = $("#mform"); if (f.innerHTML) { f.innerHTML = ""; return; }
+    let pick = null, tmr = 0;
+    f.innerHTML = `<div class="mbox"><input class="inp" id="ns" placeholder="Buscar item (ex: Serration)…" autocomplete="off"><div id="nres"></div>
+      <div id="nsel" class="mut" style="margin:8px 0"></div>
+      <div class="mform nrow"><select class="inp" id="nt"><option value="sell">Vender</option><option value="buy">Comprar</option></select><input class="inp" id="np" type="number" min="1" placeholder="Preço (p)"><input class="inp" id="nq" type="number" min="1" value="1" placeholder="Qtd"><input class="inp" id="nr" type="number" min="0" placeholder="Rank" hidden></div>
+      <button class="more" id="nok">Anunciar</button></div>`;
+    $("#ns").oninput = ev => {
+      clearTimeout(tmr); const v = ev.target.value.trim();
+      tmr = setTimeout(async () => {
+        if (v.length < 2) { $("#nres").innerHTML = ""; return; }
+        try { const R = await jf("/api/wfm/items?q=" + encodeURIComponent(v)); $("#nres").innerHTML = R.map((x, i) => `<div class="row nres" data-i="${i}">${ico(x.icon, x.name)}<span class="t">${esc(x.name)}</span></div>`).join(""); $("#nres").onclick = c => { const r = c.target.closest(".nres"); if (!r) return; pick = R[+r.dataset.i]; $("#nres").innerHTML = ""; $("#nsel").textContent = "Selecionado: " + pick.name + (pick.max ? ` (rank máx ${pick.max})` : ""); $("#nr").hidden = !pick.max; if (pick.max) $("#nr").placeholder = "Rank (0 a " + pick.max + ")"; }; } catch (er) { fail(er); }
+      }, 300);
+    };
+    $("#nok").onclick = async () => {
+      if (!pick) return fail(new Error("Escolha um item na busca."));
+      try { await post("/api/wfm/order/create", { itemId: pick.id, type: $("#nt").value, platinum: $("#np").value, quantity: $("#nq").value, rank: pick.max ? $("#nr").value : undefined }); f.innerHTML = ""; await load(); } catch (er) { fail(er); }
+    };
+  };
+  load();
+};
