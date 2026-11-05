@@ -838,8 +838,16 @@ VIEWS.mercado = async el => {
   const loadChats = async () => {
     try {
       const C = await jf("/api/wfm/chats"), un = C.reduce((a, c) => a + (c.unread || 0), 0); $("#mbadge").textContent = un ? "(" + un + ")" : "";
-      $("#mchats").innerHTML = C.length ? C.map(c => `<div class="row mchat"><span class="mav sm">${c.avatar ? `<img src="${esc(c.avatar)}" alt="" onerror="this.remove()">` : ""}<span>${esc((c.name || "?")[0])}</span></span><span class="t"><span class="nm">${esc(c.name)}${c.unread ? ` <span class="chip gold">${c.unread}</span>` : ""}</span><small class="mut">${esc(c.text)}</small></span></div>`).join("") : '<div class="empty">Nenhuma conversa.</div>';
+      $("#mchats").innerHTML = C.length ? C.map(c => `<div class="row mchat" data-id="${esc(c.id)}" data-peer="${esc(c.peer || "")}" data-name="${esc(c.name)}"><span class="mav sm">${c.avatar ? `<img src="${esc(c.avatar)}" alt="" onerror="this.remove()">` : ""}<span>${esc((c.name || "?")[0])}</span></span><span class="t"><span class="nm">${esc(c.name)}${c.unread ? ` <span class="chip gold">${c.unread}</span>` : ""}</span><small class="mut">${c.mine ? "Você: " : ""}${esc(c.text)}</small></span></div>`).join("") : '<div class="empty">Nenhuma conversa.</div>';
     } catch (e) { $("#mchats").innerHTML = `<div class="mkerr">${esc(e.message)}</div>`; }
+  };
+  $("#mchats").onclick = async e => {
+    const r = e.target.closest(".mchat"); if (!r) return;
+    openModal(`<div class="m-head"><div><h2 style="font-size:20px">${esc(r.dataset.name)}</h2><div class="mut">Histórico (somente leitura)</div></div></div><div id="thr" class="thr"><div class="empty">Carregando…</div></div>`);
+    try {
+      const M = await jf(`/api/wfm/chat?id=${encodeURIComponent(r.dataset.id)}&peer=${encodeURIComponent(r.dataset.peer)}`);
+      if ($("#thr")) { $("#thr").innerHTML = M.length ? M.map(m => `<div class="bub ${m.mine ? "me" : ""}">${br(m.text)}<small>${esc(String(m.time || "").replace("T", " ").slice(0, 16))}</small></div>`).join("") : '<div class="empty">Sem mensagens.</div>'; $("#thr").scrollTop = 1e6; }
+    } catch (er) { if ($("#thr")) $("#thr").innerHTML = `<div class="mkerr">${esc(er.message)}</div>`; }
   };
   $("#mdiag").onclick = async () => {
     $("#mdbg").innerHTML = '<div class="empty">Consultando…</div>';

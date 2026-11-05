@@ -12,8 +12,8 @@ android {
         applicationId = "com.cyber.warframeprofile"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 4
+        versionName = "1.3"
         // Python 3.12 no Chaquopy não tem 32 bits; celulares atuais são arm64
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }

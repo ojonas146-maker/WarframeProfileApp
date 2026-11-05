@@ -243,49 +243,67 @@ def delete(j):
     return {"ok": True}
 
 
-def _first(*vals):
-    for v in vals:
-        if v not in (None, "", [], {}):
-            return v
-    return None
+V1H = {"Origin": "https://warframe.market", "Referer": "https://warframe.market/"}
+STATE_F = DATA / "wfm_state.json"
+_HIDE = re.compile(r"message|text|raw|content|body|about|email|check", re.I)
+
+
+def _v1(path):
+    """O chat continua na API v1 (Authorization: JWT <token>), igual ao seu wfmb3.js."""
+    tok = _token()
+    if not tok:
+        raise WfmError("Você não entrou no warframe.market.", 401)
+    code, hd, j = _http("GET", API1 + path, tok, None, "JWT", V1H)
+    if code in (401, 403):
+        raise WfmError("Sessão do warframe.market expirada. Entre de novo.", 401)
+    if code >= 400:
+        raise WfmError(_err(j, "warframe.market respondeu %d" % code), code)
+    return j.get("payload") or {}
+
+
+def _strip(h):
+    import html
+    return html.unescape(re.sub(r"<[^>]+>", "", h or "")).strip()
+
+
+def _txt(m):
+    return (m.get("raw_message") or _strip(m.get("message")) or "").strip()
+
+
+def _peer(c):
+    name = c.get("chat_name") or "?"
+    w = c.get("chat_with") or []
+    return name, next((x for x in w if x.get("ingame_name") == name), w[0] if w else {})
+
+
+def _last(ms):
+    return max(ms, key=lambda m: m.get("send_date") or "") if ms else {}
 
 
 def chats():
-    """Lista de conversas (mensagens) da conta. Formato do v2 não confirmado: leitura tolerante."""
-    last = None
-    for path in ("/im/chats", "/chats"):
-        try:
-            j = _authed("GET", path)
-            break
-        except WfmError as e:
-            last = e
-            if e.code not in (404, 405):
-                raise
-    else:
-        raise WfmError("Mensagens indisponíveis nesta API (%s). Use o Diagnóstico." % last, 404)
     out = []
-    for c in j.get("data") or []:
-        if not isinstance(c, dict):
-            continue
-        users = _first(c.get("chatWith"), c.get("with"), c.get("users"), c.get("participants")) or []
-        users = [users] if isinstance(users, dict) else users
-        u0 = users[0] if users and isinstance(users[0], dict) else {}
-        msgs = c.get("messages") if isinstance(c.get("messages"), list) else []
-        lm = _first(c.get("lastMessage"), msgs[-1] if msgs else None) or {}
-        text = _first(lm.get("message"), lm.get("text"), lm.get("raw"), lm.get("content")) if isinstance(lm, dict) else str(lm)
-        un = _first(c.get("unread"), c.get("unreadCount"), c.get("unread_count")) or 0
-        out.append({"id": c.get("id"), "name": _first(u0.get("ingameName"), u0.get("name"), u0.get("slug"), c.get("title")) or "?",
-                    "avatar": _icon(u0.get("avatar")), "text": str(text or "")[:300], "unread": int(un) if str(un).isdigit() else (1 if un else 0),
-                    "updated": _first(c.get("updatedAt"), c.get("lastUpdate"), lm.get("createdAt") if isinstance(lm, dict) else None)})
+    for c in _v1("/im/chats").get("chats") or []:
+        name, u = _peer(c)
+        last = _last(c.get("messages") or [])
+        out.append({"id": c.get("id"), "peer": u.get("id"), "name": name, "avatar": _icon(u.get("avatar")), "status": u.get("status"),
+                    "reputation": u.get("reputation"), "text": _txt(last)[:300], "unread": int(c.get("unread_count") or 0),
+                    "updated": c.get("last_update") or last.get("send_date"),
+                    "mine": bool(last and u.get("id") and last.get("message_from") != u.get("id"))})
+    out.sort(key=lambda x: x["updated"] or "", reverse=True)
     return out
 
 
-_HIDE = re.compile(r"message|text|raw|content|body|about|email", re.I)
+def chat_messages(cid, peer):
+    if not re.fullmatch(r"[0-9a-zA-Z]{8,40}", str(cid or "")):
+        raise WfmError("ID de conversa inválido.")
+    ms = _v1("/im/chats/" + cid).get("messages") or []
+    ms = sorted(ms, key=lambda m: m.get("send_date") or "")
+    return [{"id": m.get("id"), "mine": bool(peer) and m.get("message_from") != peer, "text": _txt(m), "time": m.get("send_date")} for m in ms]
 
 
 def _shape(v, key="", depth=0):
     if isinstance(v, dict):
-        return {k: _shape(x, k, depth + 1) for k, x in list(v.items())[:40]} if depth < 5 else "{...}"
+        return {k: _shape(x, k, depth + 1) for k, x in list(v.items())[:40]} if depth < 6 else "{...}"
     if isinstance(v, list):
         return ["len=%d" % len(v)] + ([_shape(v[0], key, depth + 1)] if v else [])
     if isinstance(v, str):
@@ -294,40 +312,49 @@ def _shape(v, key="", depth=0):
 
 
 def debug():
-    """Estrutura (sem textos de mensagens) dos endpoints da conta — para eu ajustar o app. Nunca inclui o token."""
+    """Estrutura (sem textos de mensagens) dos endpoints da conta. Nunca inclui o token."""
     lines = []
-    u = None
+
+    def run(label, fn):
+        try:
+            lines.append("%s -> 200\n%s" % (label, json.dumps(_shape(fn()), ensure_ascii=False, indent=1)))
+        except WfmError as e:
+            lines.append("%s -> %s: %s" % (label, e.code, e))
+    run("GET v2 /me", lambda: _authed("GET", "/me"))
+    run("GET v1 /im/chats", lambda: _v1("/im/chats"))
     try:
-        u = me()
+        cs = _v1("/im/chats").get("chats") or []
+        if cs:
+            run("GET v1 /im/chats/<id>", lambda: _v1("/im/chats/" + cs[0]["id"]))
     except WfmError:
         pass
-    paths = ["/me", "/orders/my", "/im/chats", "/chats", "/me/chats"] + (["/user/" + u["slug"]] if u and u.get("slug") else [])
-    for pth in paths:
-        try:
-            j = _authed("GET", pth)
-            if pth == "/orders/my":
-                j = dict(j, data=(j.get("data") or [])[:2])
-            lines.append("GET %s -> 200\n%s" % (pth, json.dumps(_shape(j), ensure_ascii=False, indent=1)))
-        except WfmError as e:
-            lines.append("GET %s -> %s: %s" % (pth, e.code, e))
     return "\n\n".join(lines)
 
 
-STATE_F = DATA / "wfm_state.json"
-
-
 def poll():
-    """Chamado de tempos em tempos pelo app: avisa quando o total de mensagens não lidas AUMENTA."""
-    C = chats()
-    n = sum(c["unread"] for c in C)
-    prev = _rd(STATE_F, {}).get("unread", 0)
+    """Detecta mensagens NOVAS recebidas (como o seu monitor): compara ids de mensagens já vistos."""
+    st = _rd(STATE_F, {})
+    first = "known" not in st
+    known = set(st.get("known") or [])
+    new, unread = [], 0
+    for c in _v1("/im/chats").get("chats") or []:
+        name, u = _peer(c)
+        unread += int(c.get("unread_count") or 0)
+        for m in sorted(c.get("messages") or [], key=lambda x: x.get("send_date") or ""):
+            mid = m.get("id")
+            if not mid or mid in known:
+                continue
+            known.add(mid)
+            if u.get("id") and m.get("message_from") == u.get("id"):
+                new.append((name, _txt(m)))
     try:
         DATA.mkdir(parents=True, exist_ok=True)
-        STATE_F.write_text(json.dumps({"unread": n}), encoding="utf-8")
+        STATE_F.write_text(json.dumps({"known": list(known)[-3000:]}), encoding="utf-8")
     except Exception:
         pass
-    top = next((c for c in C if c["unread"]), None)
-    return {"unread": n, "notify": n > prev, "text": ("%s: %s" % (top["name"], top["text"][:80])) if top else ""}
+    notify = bool(new) and not first
+    return {"unread": unread, "notify": notify, "count": len(new) if notify else 0,
+            "text": ("%s: %s" % (new[-1][0], new[-1][1][:80])) if notify else ""}
 
 
 def handle_get(path, q):
@@ -335,6 +362,8 @@ def handle_get(path, q):
         return poll()
     if path == "/api/wfm/chats":
         return chats()
+    if path == "/api/wfm/chat":
+        return chat_messages((q.get("id") or [""])[0], (q.get("peer") or [""])[0])
     if path == "/api/wfm/debug":
         return {"text": debug()}
     if path == "/api/wfm/status":
