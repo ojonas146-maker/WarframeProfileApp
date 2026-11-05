@@ -101,6 +101,7 @@ class MainActivity : Activity() {
         root.addView(status, FrameLayout.LayoutParams(lp, lp))
         setContentView(root)
 
+        if (android.os.Build.VERSION.SDK_INT >= 33) requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 7)
         Thread { boot() }.start()
     }
 
@@ -152,6 +153,17 @@ class MainActivity : Activity() {
 
     /** Ponte JS -> Android (só a página local do app enxerga). */
     inner class Bridge {
+        @JavascriptInterface
+        fun notify(title: String, text: String) {
+            val nm = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
+            nm.createNotificationChannel(android.app.NotificationChannel("msgs", "Mensagens", android.app.NotificationManager.IMPORTANCE_DEFAULT))
+            val pi = android.app.PendingIntent.getActivity(this@MainActivity, 0, Intent(this@MainActivity, MainActivity::class.java),
+                android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT)
+            nm.notify(1, android.app.Notification.Builder(this@MainActivity, "msgs").setSmallIcon(android.R.drawable.stat_notify_chat)
+                .setContentTitle(title).setContentText(text).setStyle(android.app.Notification.BigTextStyle().bigText(text))
+                .setContentIntent(pi).setAutoCancel(true).build())
+        }
+
         @JavascriptInterface
         fun loginWfm() {
             runOnUiThread { startActivityForResult(Intent(this@MainActivity, WfmLoginActivity::class.java), REQ_WFM) }

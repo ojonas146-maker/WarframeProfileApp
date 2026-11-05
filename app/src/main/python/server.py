@@ -162,6 +162,24 @@ def pretty(path: str) -> str:
     name = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", name).replace("_", " ")
     return name.strip()
 
+_NAME_IDX = {}
+
+
+def local_icon(name: str):
+    """Ícone do pacote do app (catálogo) pelo nome do item do warframe.market."""
+    if not _NAME_IDX:
+        for pth, e in ((catalog() or {}).get("items", {})).items():
+            n = (e or {}).get("n")
+            if n and e.get("i"):
+                _NAME_IDX.setdefault(n.lower(), pth)
+        _NAME_IDX["_"] = ""
+    n = (name or "").lower().strip()
+    for cand in (n, n[:-4] if n.endswith(" set") else "", n.replace(" blueprint", ""), n[:-4].replace(" blueprint", "") if n.endswith(" set") else ""):
+        if cand and cand in _NAME_IDX:
+            return icon_of(_NAME_IDX[cand])
+    return None
+
+
 def icon_of(path: str):
     cat = catalog()
     if not cat:
@@ -1197,7 +1215,12 @@ class H(SimpleHTTPRequestHandler):
                 return self.send_json({"error": str(e)}, 502)
         if u.path.startswith("/api/wfm/"):
             try:
-                return self.send_json(wfmacct.handle_get(u.path, q))
+                res = wfmacct.handle_get(u.path, q)
+                if isinstance(res, list):
+                    for o in res:
+                        if isinstance(o, dict) and o.get("name") and "text" not in o:
+                            o["icon"] = local_icon(o["name"]) or o.get("icon")
+                return self.send_json(res)
             except wfmacct.WfmError as e:
                 return self.send_json({"error": str(e)}, e.code)
         if u.path == "/api/effects":

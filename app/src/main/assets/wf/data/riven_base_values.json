@@ -1,0 +1,493 @@
+{
+  "_meta": {
+    "source": "https://wiki.warframe.com/w/Riven_Mods",
+    "categories": [
+      "Rifle",
+      "Shotgun",
+      "Pistol",
+      "Archgun",
+      "Melee"
+    ],
+    "note": "Values are positive-only base %. Rolls vary 0.9x-1.1x, scaled by disposition and stat-count multiplier. null = stat not rollable in that category. Updated 2026-10 for Riven Splicing (Glacial Defiance) support + wiki sync.",
+    "updated": "2026-10-08"
+  },
+  "stats": {
+    "Additional Combo Count Chance": {
+      "Rifle": null,
+      "Shotgun": null,
+      "Pistol": null,
+      "Archgun": null,
+      "Melee": 58.77,
+      "unit": "%",
+      "positive_only": true
+    },
+    "Chance to Gain Combo Count": {
+      "Rifle": null,
+      "Shotgun": null,
+      "Pistol": null,
+      "Archgun": null,
+      "Melee": 104.85,
+      "unit": "%",
+      "negative_only": true,
+      "note": "Distinct curse from Additional Combo Count Chance (WFM url_name chance_to_gain_combo_count). Base from wiki."
+    },
+    "Ammo Maximum": {
+      "Rifle": 49.95,
+      "Shotgun": 90,
+      "Pistol": 90,
+      "Archgun": 99.9,
+      "Melee": null,
+      "unit": "%"
+    },
+    "Damage vs. Corpus": {
+      "Rifle": 0.45,
+      "Shotgun": 0.45,
+      "Pistol": 0.45,
+      "Archgun": 0.45,
+      "Melee": 0.45,
+      "unit": "x"
+    },
+    "Damage vs. Grineer": {
+      "Rifle": 0.45,
+      "Shotgun": 0.45,
+      "Pistol": 0.45,
+      "Archgun": 0.45,
+      "Melee": 0.45,
+      "unit": "x"
+    },
+    "Damage vs. Infested": {
+      "Rifle": 0.45,
+      "Shotgun": 0.45,
+      "Pistol": 0.45,
+      "Archgun": 0.45,
+      "Melee": 0.45,
+      "unit": "x"
+    },
+    "Cold Damage": {
+      "Rifle": 90,
+      "Shotgun": 90,
+      "Pistol": 90,
+      "Archgun": 119.7,
+      "Melee": 90,
+      "unit": "%",
+      "positive_only": true
+    },
+    "Combo Duration": {
+      "Rifle": null,
+      "Shotgun": null,
+      "Pistol": null,
+      "Archgun": null,
+      "Melee": 8.1,
+      "unit": "s"
+    },
+    "Critical Chance": {
+      "Rifle": 149.99,
+      "Shotgun": 90,
+      "Pistol": 149.99,
+      "Archgun": 99.9,
+      "Melee": 180,
+      "unit": "%"
+    },
+    "Critical Chance for Slide Attack": {
+      "Rifle": null,
+      "Shotgun": null,
+      "Pistol": null,
+      "Archgun": null,
+      "Melee": 120,
+      "unit": "%"
+    },
+    "Critical Damage": {
+      "Rifle": 120,
+      "Shotgun": 90,
+      "Pistol": 90,
+      "Archgun": 80.1,
+      "Melee": 90,
+      "unit": "%"
+    },
+    "Damage": {
+      "Rifle": 165,
+      "Shotgun": 164.7,
+      "Pistol": 219.6,
+      "Archgun": 99.9,
+      "Melee": 164.7,
+      "unit": "%",
+      "positive_only": true
+    },
+    "Electricity Damage": {
+      "Rifle": 90,
+      "Shotgun": 90,
+      "Pistol": 90,
+      "Archgun": 119.7,
+      "Melee": 90,
+      "unit": "%",
+      "positive_only": true
+    },
+    "Heat Damage": {
+      "Rifle": 90,
+      "Shotgun": 90,
+      "Pistol": 90,
+      "Archgun": 119.7,
+      "Melee": 90,
+      "unit": "%",
+      "positive_only": true
+    },
+    "Finisher Damage": {
+      "Rifle": null,
+      "Shotgun": null,
+      "Pistol": null,
+      "Archgun": null,
+      "Melee": 119.7,
+      "unit": "%"
+    },
+    "Fire Rate / Attack Speed": {
+      "Rifle": 60.03,
+      "Shotgun": 90,
+      "Pistol": 74.7,
+      "Archgun": 60.03,
+      "Melee": 54.9,
+      "unit": "%"
+    },
+    "Projectile Speed": {
+      "Rifle": 90,
+      "Shotgun": 90,
+      "Pistol": 90,
+      "Archgun": null,
+      "Melee": null,
+      "unit": "%"
+    },
+    "Initial Combo": {
+      "Rifle": null,
+      "Shotgun": null,
+      "Pistol": null,
+      "Archgun": null,
+      "Melee": 24.5,
+      "unit": "flat"
+    },
+    "Impact Damage": {
+      "Rifle": 119.97,
+      "Shotgun": 119.97,
+      "Pistol": 119.97,
+      "Archgun": 90,
+      "Melee": 119.7,
+      "unit": "%",
+      "physical": true
+    },
+    "Magazine Capacity": {
+      "Rifle": 50,
+      "Shotgun": 50,
+      "Pistol": 50,
+      "Archgun": 60.3,
+      "Melee": null,
+      "unit": "%"
+    },
+    "Heavy Attack Efficiency": {
+      "Rifle": null,
+      "Shotgun": null,
+      "Pistol": null,
+      "Archgun": null,
+      "Melee": 73.44,
+      "unit": "%"
+    },
+    "Multishot": {
+      "Rifle": 90,
+      "Shotgun": 119.7,
+      "Pistol": 119.7,
+      "Archgun": 60.3,
+      "Melee": null,
+      "unit": "%"
+    },
+    "Toxin Damage": {
+      "Rifle": 90,
+      "Shotgun": 90,
+      "Pistol": 90,
+      "Archgun": 119.7,
+      "Melee": 90,
+      "unit": "%",
+      "positive_only": true
+    },
+    "Punch Through": {
+      "Rifle": 2.7,
+      "Shotgun": 2.7,
+      "Pistol": 2.7,
+      "Archgun": 2.7,
+      "Melee": null,
+      "unit": "m",
+      "positive_only": true
+    },
+    "Puncture Damage": {
+      "Rifle": 119.97,
+      "Shotgun": 119.97,
+      "Pistol": 119.97,
+      "Archgun": 90,
+      "Melee": 119.7,
+      "unit": "%",
+      "physical": true
+    },
+    "Reload Speed": {
+      "Rifle": 50,
+      "Shotgun": 50,
+      "Pistol": 50,
+      "Archgun": 99.9,
+      "Melee": null,
+      "unit": "%"
+    },
+    "Range": {
+      "Rifle": null,
+      "Shotgun": null,
+      "Pistol": null,
+      "Archgun": null,
+      "Melee": 1.94,
+      "unit": "m"
+    },
+    "Slash Damage": {
+      "Rifle": 119.97,
+      "Shotgun": 119.97,
+      "Pistol": 119.97,
+      "Archgun": 90,
+      "Melee": 119.7,
+      "unit": "%",
+      "physical": true
+    },
+    "Status Chance": {
+      "Rifle": 90,
+      "Shotgun": 90,
+      "Pistol": 90,
+      "Archgun": 60.3,
+      "Melee": 90,
+      "unit": "%"
+    },
+    "Status Duration": {
+      "Rifle": 99.99,
+      "Shotgun": 99.99,
+      "Pistol": 99.99,
+      "Archgun": 99.99,
+      "Melee": 99.99,
+      "unit": "%"
+    },
+    "Weapon Recoil": {
+      "Rifle": 90,
+      "Shotgun": 90,
+      "Pistol": 90,
+      "Archgun": 90,
+      "Melee": null,
+      "unit": "%"
+    },
+    "Zoom": {
+      "Rifle": 59.99,
+      "Shotgun": 41.994,
+      "Pistol": 80.1,
+      "Archgun": 59.99,
+      "Melee": null,
+      "unit": "%"
+    },
+    "Ammo Efficiency": {
+      "Rifle": 45,
+      "Shotgun": 45,
+      "Pistol": 45,
+      "Archgun": 45,
+      "Melee": null,
+      "unit": "%",
+      "spliced": true,
+      "positive_only": true
+    },
+    "Blast Damage": {
+      "Rifle": 90,
+      "Shotgun": 90,
+      "Pistol": 90,
+      "Archgun": 90,
+      "Melee": 90,
+      "unit": "%",
+      "spliced": true,
+      "positive_only": true
+    },
+    "Corrosive Damage": {
+      "Rifle": 90,
+      "Shotgun": 90,
+      "Pistol": 90,
+      "Archgun": 90,
+      "Melee": 90,
+      "unit": "%",
+      "spliced": true,
+      "positive_only": true
+    },
+    "Damage vs. Orokin": {
+      "Rifle": 0.45,
+      "Shotgun": 0.45,
+      "Pistol": 0.45,
+      "Archgun": 0.45,
+      "Melee": 0.45,
+      "unit": "x",
+      "spliced": true
+    },
+    "Damage vs. Scaldra": {
+      "Rifle": 0.45,
+      "Shotgun": 0.45,
+      "Pistol": 0.45,
+      "Archgun": 0.45,
+      "Melee": 0.45,
+      "unit": "x",
+      "spliced": true
+    },
+    "Damage vs. Techrot": {
+      "Rifle": 0.45,
+      "Shotgun": 0.45,
+      "Pistol": 0.45,
+      "Archgun": 0.45,
+      "Melee": 0.45,
+      "unit": "x",
+      "spliced": true
+    },
+    "Gas Damage": {
+      "Rifle": 90,
+      "Shotgun": 90,
+      "Pistol": 90,
+      "Archgun": 90,
+      "Melee": 90,
+      "unit": "%",
+      "spliced": true,
+      "positive_only": true
+    },
+    "Heavy Attack Wind Up Speed": {
+      "Rifle": null,
+      "Shotgun": null,
+      "Pistol": null,
+      "Archgun": null,
+      "Melee": 119.7,
+      "unit": "%",
+      "spliced": true
+    },
+    "Magnetic Damage": {
+      "Rifle": 90,
+      "Shotgun": 90,
+      "Pistol": 90,
+      "Archgun": 90,
+      "Melee": 90,
+      "unit": "%",
+      "spliced": true,
+      "positive_only": true
+    },
+    "Melee Damage On Heavy Attack": {
+      "Rifle": null,
+      "Shotgun": null,
+      "Pistol": null,
+      "Archgun": null,
+      "Melee": 119.7,
+      "unit": "%",
+      "spliced": true
+    },
+    "Parry Angle": {
+      "Rifle": null,
+      "Shotgun": null,
+      "Pistol": null,
+      "Archgun": null,
+      "Melee": 81,
+      "unit": "%",
+      "spliced": true,
+      "note": "Bonus is a percentage despite not being shown as such in-game."
+    },
+    "Radiation Damage": {
+      "Rifle": 90,
+      "Shotgun": 90,
+      "Pistol": 90,
+      "Archgun": 90,
+      "Melee": 90,
+      "unit": "%",
+      "spliced": true,
+      "positive_only": true
+    },
+    "Reload While Holstered": {
+      "Rifle": 90,
+      "Shotgun": 90,
+      "Pistol": 90,
+      "Archgun": null,
+      "Melee": null,
+      "unit": "%",
+      "spliced": true
+    },
+    "Slam Attack Damage": {
+      "Rifle": null,
+      "Shotgun": null,
+      "Pistol": null,
+      "Archgun": null,
+      "Melee": 119.7,
+      "unit": "%",
+      "spliced": true
+    },
+    "Status Damage": {
+      "Rifle": 90,
+      "Shotgun": 90,
+      "Pistol": 90,
+      "Archgun": 90,
+      "Melee": 90,
+      "unit": "%",
+      "spliced": true
+    },
+    "Viral Damage": {
+      "Rifle": 90,
+      "Shotgun": 90,
+      "Pistol": 90,
+      "Archgun": 90,
+      "Melee": 90,
+      "unit": "%",
+      "spliced": true,
+      "positive_only": true
+    },
+    "Weakpoint Damage": {
+      "Rifle": 225,
+      "Shotgun": 225,
+      "Pistol": 225,
+      "Archgun": 225,
+      "Melee": null,
+      "unit": "%",
+      "spliced": true
+    },
+    "Weakpoint Critical Chance": {
+      "Rifle": 247.5,
+      "Shotgun": 247.5,
+      "Pistol": 247.5,
+      "Archgun": 247.5,
+      "Melee": null,
+      "unit": "%",
+      "spliced": true
+    }
+  },
+  "count_multipliers": {
+    "2P": {
+      "positive": 0.99,
+      "negative": null
+    },
+    "2P1N": {
+      "positive": 1.2375,
+      "negative": -0.495
+    },
+    "3P": {
+      "positive": 0.75,
+      "negative": null
+    },
+    "3P1N": {
+      "positive": 0.9375,
+      "negative": -0.75
+    }
+  },
+  "roll_variance": {
+    "min": 0.9,
+    "max": 1.1
+  },
+  "type_to_category": {
+    "Rifle": "Rifle",
+    "Bow": "Rifle",
+    "Sniper": "Rifle",
+    "Launcher": "Rifle",
+    "Shotgun": "Shotgun",
+    "Pistol": "Pistol",
+    "Dual Pistols": "Pistol",
+    "Throwing": "Pistol",
+    "Arch-Gun": "Archgun",
+    "Melee": "Melee",
+    "Arch-Melee": "Melee",
+    "Zaw Component": "Melee",
+    "Kitgun": "Rifle",
+    "Robotic": "Rifle",
+    "Hound": "Melee"
+  }
+}

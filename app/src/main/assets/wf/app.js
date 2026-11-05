@@ -727,6 +727,7 @@ boot();
 
 /* ================================================================ helpers novos */
 const jf = async u => { const r = await fetch(u, { cache: "no-store" }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "Erro " + r.status); return j; };
+const gc = g => String(g).replace("+", "p").replace("-", "m");
 const br = t => esc(t).replace(/\n/g, "<br>");
 
 /* ---- efeitos de mods / arcanos (detalhe ao tocar no item do inventário) */
@@ -753,19 +754,19 @@ async function showFx(x, arc) {
 /* ================================================================ RIVENS */
 VIEWS.rivens = async el => {
   const L = await jf("/api/rivens");
-  let q = "", fam = "", sort = "rerolls", shown = 40;
+  let q = "", fam = "", sort = "grade", shown = 40;
   const FN = { rifle: "Rifle", pistol: "Pistola", shotgun: "Shotgun", melee: "Melee", arch: "Arch-gun" }, fams = [...new Set(L.map(r => r.fam))];
   el.innerHTML = `${head("Rivens", `${fmt(L.length)} rivens no seu lastData · valores no rank atual e no máximo`)}
     <div class="tabs" id="rf"><span class="pill on" data-f="">Todos</span>${fams.map(f => `<span class="pill" data-f="${f}">${FN[f] || f}</span>`).join("")}</div>
-    <div class="tools"><input class="inp search" id="rq" placeholder="Buscar arma ou nome…" autocomplete="off"><select class="inp" id="rs"><option value="rerolls">Mais rerolls</option><option value="avg">Melhor rolagem</option><option value="mr">Maestria</option><option value="name">Nome</option></select></div>
+    <div class="tools"><input class="inp search" id="rq" placeholder="Buscar arma ou nome…" autocomplete="off"><select class="inp" id="rs"><option value="grade">Melhor grade</option><option value="rerolls">Mais rerolls</option><option value="mr">Maestria</option><option value="name">Nome</option></select></div>
     <div class="count" id="rc"></div><div class="grid rivs" id="rl"></div><div id="rm"></div>
-    <div class="mut" style="font-size:12px;margin-top:12px">Valores calculados pela rolagem de cada Riven (disposição 1.2 quando a do warframe.market ainda não foi baixada). Armas que não são rifle usam tabelas aproximadas (≈).</div>`;
-  const card = r => `<div class="riv"><div class="rv-h"><span class="rv-d">${r.drain}</span><span class="rv-n">${esc(r.name)}</span></div>
-    <div class="rv-s">${r.stats.map(s => `<div class="${s.neg ? "neg" : "pos"}">${esc(s.cur)} ${esc(s.label)}${s.max !== s.cur ? ` <small>(máx ${esc(s.max)})</small>` : ""} <small class="q">${s.q}%</small></div>`).join("")}</div>
-    <div class="rv-f"><span>MR ${r.mr}</span><span>R${r.rank}/8</span><span>↻ ${fmt(r.rerolls)}</span><span class="chip">${esc(r.pol)}</span><span class="chip ${r.avg >= 70 ? "ok" : ""}">rolagem ${r.avg}%</span>${r.approx ? '<span class="chip">≈</span>' : ""}</div></div>`;
+    <div class="mut" style="font-size:12px;margin-top:12px">Grade calculada como no seu grading.js: base da categoria × disposição 1.2 × multiplicador (2P/3P…) comparado com a rolagem real (S a F). Dano contra facção aparece como multiplicador (x1.47).</div>`;
+  const card = r => `<div class="riv"><div class="rv-h"><span class="rv-d">${r.drain}</span><span class="rv-n">${esc(r.name)}</span><b class="gr g-${gc(r.grade)} rv-g" title="Grade geral (${r.gdev}%)">${r.grade}</b></div>
+    <div class="rv-s">${r.stats.map(s => `<div class="${s.neg ? "neg" : "pos"}">${esc(s.cur)} ${esc(s.label)}${s.max !== s.cur ? ` <small>(máx ${esc(s.max)})</small>` : ""} ${s.g ? `<b class="gr g-${gc(s.g)}" title="${s.dev}% vs esperado">${s.g}</b>` : ""}</div>`).join("")}</div>
+    <div class="rv-f"><span>MR ${r.mr}</span><span>R${r.rank}/8</span><span>↻ ${fmt(r.rerolls)}</span><span class="chip">${esc(r.pol)}</span><span class="chip">${r.cfg}</span></div></div>`;
   const draw = () => {
     let A = L.filter(r => (!fam || r.fam === fam) && (!q || r.name.toLowerCase().includes(q)));
-    const K = { rerolls: (a, b) => b.rerolls - a.rerolls, avg: (a, b) => b.avg - a.avg, mr: (a, b) => b.mr - a.mr, name: (a, b) => a.name.localeCompare(b.name) };
+    const K = { grade: (a, b) => b.gdev - a.gdev, rerolls: (a, b) => b.rerolls - a.rerolls, avg: (a, b) => b.avg - a.avg, mr: (a, b) => b.mr - a.mr, name: (a, b) => a.name.localeCompare(b.name) };
     A.sort((a, b) => K[sort](a, b) || a.name.localeCompare(b.name));
     $("#rc").textContent = `${fmt(A.length)} de ${fmt(L.length)} rivens`;
     $("#rl").innerHTML = A.slice(0, shown).map(card).join("") || '<div class="empty">Nenhum Riven.</div>';
@@ -799,9 +800,16 @@ VIEWS.mercado = async el => {
     $("#mtok").onclick = () => go("/api/wfm/token", { token: $("#mt").value });
     return;
   }
-  el.innerHTML = `${head("Mercado", `Logado como <b>${esc(st.user.name)}</b>`)}
-    <div class="tools"><button class="pill" id="mnew">+ Novo anúncio</button><button class="pill" id="mref">Atualizar</button><button class="pill" id="mout">Sair</button></div>
-    <div id="mform"></div><div class="mkerr" id="merr" hidden></div><div class="list" id="mlist"><div class="empty">Carregando…</div></div>`;
+  const U = st.user, ST = { ingame: "Em jogo", online: "Online", invisible: "Invisível", offline: "Offline" };
+  el.innerHTML = `<div class="mprof"><div class="mav">${U.avatar ? `<img src="${esc(U.avatar)}" alt="" onerror="this.remove()">` : ""}<span>${esc((U.name || "?")[0])}</span></div>
+      <div class="mpi"><h1>${esc(U.name)}</h1><div class="mut">${esc(ST[U.status] || U.status || "")}${U.platform ? " · " + esc(String(U.platform).toUpperCase()) : ""}${U.locale ? " · " + esc(U.locale) : ""}${U.role ? " · " + esc(U.role) : ""}</div>
+      ${U.reputation != null ? `<div class="mrep">+${fmt(U.reputation)} reputação</div>` : ""}</div></div>
+    ${U.about ? `<div class="mabout">${br(U.about)}</div>` : ""}
+    <div class="mstats" id="mstat"></div>
+    <div class="tabs" id="mtabs"><span class="pill on" data-t="o">Ordens</span><span class="pill" data-t="m">Mensagens <b id="mbadge"></b></span></div>
+    <div class="tools"><button class="pill" id="mnew">+ Novo anúncio</button><button class="pill" id="mref">Atualizar</button><button class="pill" id="mdiag">Diagnóstico</button><button class="pill" id="mout">Sair</button></div>
+    <div id="mform"></div><div class="mkerr" id="merr" hidden></div><div id="mdbg"></div>
+    <div class="list" id="mlist"><div class="empty">Carregando…</div></div><div class="list" id="mchats" hidden></div>`;
   const fail = e => { if (e.message.includes("expirada")) return route(); const b = $("#merr"); b.textContent = e.message; b.hidden = false; };
   let O = [];
   const load = async () => {
@@ -810,7 +818,8 @@ VIEWS.mercado = async el => {
     const row = o => `<div class="row mo ${o.visible ? "" : "hid"}" data-id="${o.id}">${ico(o.icon, o.name)}<span class="t"><span class="nm">${esc(o.name)}${o.rank != null && o.max ? ` <span class="chip gold">R${o.rank}/${o.max}</span>` : ""} <span class="chip ${o.type === "sell" ? "ok" : ""}">${o.type === "sell" ? "vende" : "compra"}</span></span>
       <small class="mut">${fmt(o.platinum)}p × ${o.quantity}${o.visible ? "" : " · oculto"}</small>
       <span class="mact"><input class="inp mp" type="number" min="1" value="${o.platinum}"><button class="pill" data-a="save">Salvar preço</button><button class="pill" data-a="vis">${o.visible ? "Ocultar" : "Mostrar"}</button><button class="pill danger" data-a="del">Remover</button></span></span></div>`;
-    const sells = O.filter(o => o.type === "sell"), buys = O.filter(o => o.type !== "sell");
+    const sells = O.filter(o => o.type === "sell"), buys = O.filter(o => o.type !== "sell"), sum = a => a.reduce((t, o) => t + o.platinum * o.quantity, 0);
+    $("#mstat").innerHTML = `<div><b>${fmt(O.length)}</b><span>ordens</span></div><div><b>${fmt(sells.length)}</b><span>vendendo · ${fmt(sum(sells))}p</span></div><div><b>${fmt(buys.length)}</b><span>comprando · ${fmt(sum(buys))}p</span></div>`;
     $("#mlist").innerHTML = (O.length ? "" : '<div class="empty">Nenhuma ordem ativa.</div>') +
       (sells.length ? `<div class="sec"><h2>Vendendo (${sells.length})</h2></div>${sells.map(row).join("")}` : "") + (buys.length ? `<div class="sec"><h2>Comprando (${buys.length})</h2></div>${buys.map(row).join("")}` : "");
   };
@@ -823,7 +832,20 @@ VIEWS.mercado = async el => {
       await load();
     } catch (er) { fail(er); }
   };
-  $("#mref").onclick = load;
+  $("#mref").onclick = () => { load(); loadChats(); };
+  let showT = "o";
+  $("#mtabs").onclick = e => { const t = e.target.closest(".pill"); if (!t) return; showT = t.dataset.t; $$("#mtabs .pill").forEach(x => x.classList.toggle("on", x === t)); $("#mlist").hidden = showT !== "o"; $("#mchats").hidden = showT !== "m"; };
+  const loadChats = async () => {
+    try {
+      const C = await jf("/api/wfm/chats"), un = C.reduce((a, c) => a + (c.unread || 0), 0); $("#mbadge").textContent = un ? "(" + un + ")" : "";
+      $("#mchats").innerHTML = C.length ? C.map(c => `<div class="row mchat"><span class="mav sm">${c.avatar ? `<img src="${esc(c.avatar)}" alt="" onerror="this.remove()">` : ""}<span>${esc((c.name || "?")[0])}</span></span><span class="t"><span class="nm">${esc(c.name)}${c.unread ? ` <span class="chip gold">${c.unread}</span>` : ""}</span><small class="mut">${esc(c.text)}</small></span></div>`).join("") : '<div class="empty">Nenhuma conversa.</div>';
+    } catch (e) { $("#mchats").innerHTML = `<div class="mkerr">${esc(e.message)}</div>`; }
+  };
+  $("#mdiag").onclick = async () => {
+    $("#mdbg").innerHTML = '<div class="empty">Consultando…</div>';
+    try { const r = await jf("/api/wfm/debug"); $("#mdbg").innerHTML = `<div class="mbox"><button class="pill" id="mcp">Copiar</button><pre class="dbg">${esc(r.text)}</pre></div>`; $("#mcp").onclick = () => navigator.clipboard.writeText(r.text).then(() => { $("#mcp").textContent = "Copiado ✓"; }); }
+    catch (e) { $("#mdbg").innerHTML = `<div class="mkerr">${esc(e.message)}</div>`; }
+  };
   $("#mout").onclick = async () => { await post("/api/wfm/logout").catch(() => {}); route(); };
   $("#mnew").onclick = () => {
     const f = $("#mform"); if (f.innerHTML) { f.innerHTML = ""; return; }
@@ -844,5 +866,14 @@ VIEWS.mercado = async el => {
       try { await post("/api/wfm/order/create", { itemId: pick.id, type: $("#nt").value, platinum: $("#np").value, quantity: $("#nq").value, rank: pick.max ? $("#nr").value : undefined }); f.innerHTML = ""; await load(); } catch (er) { fail(er); }
     };
   };
-  load();
+  load(); loadChats();
 };
+
+/* ---- notificação de novas mensagens do warframe.market (enquanto o app está aberto) */
+(function () {
+  async function tick() {
+    if (!(window.Android && window.Android.notify)) return;
+    try { const r = await jf("/api/wfm/poll"); if (r.notify) window.Android.notify("warframe.market", (r.unread + " mensagem(ns) não lida(s)") + (r.text ? " · " + r.text : "")); } catch (e) { }
+  }
+  setTimeout(tick, 10000); setInterval(tick, 60000);
+})();

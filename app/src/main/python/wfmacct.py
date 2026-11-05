@@ -141,7 +141,11 @@ def me():
             return None
         raise
     d = j.get("data") or {}
-    _me.update(ts=time.time(), data={"name": d.get("ingameName") or d.get("slug") or "?", "slug": d.get("slug"), "status": d.get("status")})
+    _me.update(ts=time.time(), data={
+        "name": d.get("ingameName") or d.get("slug") or "?", "slug": d.get("slug"), "status": d.get("status"),
+        "avatar": _icon(d.get("avatar")), "about": d.get("about") or "", "reputation": d.get("reputation"),
+        "platform": d.get("platform"), "locale": d.get("locale") or d.get("language"), "role": d.get("role"),
+        "keys": sorted(d.keys())})
     return _me["data"]
 
 
@@ -239,7 +243,100 @@ def delete(j):
     return {"ok": True}
 
 
+def _first(*vals):
+    for v in vals:
+        if v not in (None, "", [], {}):
+            return v
+    return None
+
+
+def chats():
+    """Lista de conversas (mensagens) da conta. Formato do v2 não confirmado: leitura tolerante."""
+    last = None
+    for path in ("/im/chats", "/chats"):
+        try:
+            j = _authed("GET", path)
+            break
+        except WfmError as e:
+            last = e
+            if e.code not in (404, 405):
+                raise
+    else:
+        raise WfmError("Mensagens indisponíveis nesta API (%s). Use o Diagnóstico." % last, 404)
+    out = []
+    for c in j.get("data") or []:
+        if not isinstance(c, dict):
+            continue
+        users = _first(c.get("chatWith"), c.get("with"), c.get("users"), c.get("participants")) or []
+        users = [users] if isinstance(users, dict) else users
+        u0 = users[0] if users and isinstance(users[0], dict) else {}
+        msgs = c.get("messages") if isinstance(c.get("messages"), list) else []
+        lm = _first(c.get("lastMessage"), msgs[-1] if msgs else None) or {}
+        text = _first(lm.get("message"), lm.get("text"), lm.get("raw"), lm.get("content")) if isinstance(lm, dict) else str(lm)
+        un = _first(c.get("unread"), c.get("unreadCount"), c.get("unread_count")) or 0
+        out.append({"id": c.get("id"), "name": _first(u0.get("ingameName"), u0.get("name"), u0.get("slug"), c.get("title")) or "?",
+                    "avatar": _icon(u0.get("avatar")), "text": str(text or "")[:300], "unread": int(un) if str(un).isdigit() else (1 if un else 0),
+                    "updated": _first(c.get("updatedAt"), c.get("lastUpdate"), lm.get("createdAt") if isinstance(lm, dict) else None)})
+    return out
+
+
+_HIDE = re.compile(r"message|text|raw|content|body|about|email", re.I)
+
+
+def _shape(v, key="", depth=0):
+    if isinstance(v, dict):
+        return {k: _shape(x, k, depth + 1) for k, x in list(v.items())[:40]} if depth < 5 else "{...}"
+    if isinstance(v, list):
+        return ["len=%d" % len(v)] + ([_shape(v[0], key, depth + 1)] if v else [])
+    if isinstance(v, str):
+        return "<texto %d chars>" % len(v) if _HIDE.search(key) else v[:40]
+    return v
+
+
+def debug():
+    """Estrutura (sem textos de mensagens) dos endpoints da conta — para eu ajustar o app. Nunca inclui o token."""
+    lines = []
+    u = None
+    try:
+        u = me()
+    except WfmError:
+        pass
+    paths = ["/me", "/orders/my", "/im/chats", "/chats", "/me/chats"] + (["/user/" + u["slug"]] if u and u.get("slug") else [])
+    for pth in paths:
+        try:
+            j = _authed("GET", pth)
+            if pth == "/orders/my":
+                j = dict(j, data=(j.get("data") or [])[:2])
+            lines.append("GET %s -> 200\n%s" % (pth, json.dumps(_shape(j), ensure_ascii=False, indent=1)))
+        except WfmError as e:
+            lines.append("GET %s -> %s: %s" % (pth, e.code, e))
+    return "\n\n".join(lines)
+
+
+STATE_F = DATA / "wfm_state.json"
+
+
+def poll():
+    """Chamado de tempos em tempos pelo app: avisa quando o total de mensagens não lidas AUMENTA."""
+    C = chats()
+    n = sum(c["unread"] for c in C)
+    prev = _rd(STATE_F, {}).get("unread", 0)
+    try:
+        DATA.mkdir(parents=True, exist_ok=True)
+        STATE_F.write_text(json.dumps({"unread": n}), encoding="utf-8")
+    except Exception:
+        pass
+    top = next((c for c in C if c["unread"]), None)
+    return {"unread": n, "notify": n > prev, "text": ("%s: %s" % (top["name"], top["text"][:80])) if top else ""}
+
+
 def handle_get(path, q):
+    if path == "/api/wfm/poll":
+        return poll()
+    if path == "/api/wfm/chats":
+        return chats()
+    if path == "/api/wfm/debug":
+        return {"text": debug()}
     if path == "/api/wfm/status":
         return status()
     if path == "/api/wfm/orders":
