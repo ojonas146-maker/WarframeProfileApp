@@ -358,6 +358,9 @@ def poll():
 
 
 def handle_get(path, q):
+    if path == "/api/wfm/presence":
+        import wfmws
+        return wfmws.state()
     if path == "/api/wfm/poll":
         return poll()
     if path == "/api/wfm/chats":
@@ -376,6 +379,9 @@ def handle_get(path, q):
 
 
 def handle_post(path, j):
+    if path == "/api/wfm/presence":
+        import wfmws
+        return wfmws.set_status(j.get("status") or "")
     if path == "/api/wfm/token":
         set_token(j.get("token"))
         return status()

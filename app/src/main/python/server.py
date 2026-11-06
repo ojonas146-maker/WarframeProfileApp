@@ -6,7 +6,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 import market
-import effects, rivens, wfmacct
+import effects, rivens, settings, wfmacct
 import auth
 from http.cookies import SimpleCookie
 
@@ -468,6 +468,39 @@ def _with_max(e, kind):
         e["slug"], e["note"] = None, "rank intermediário · sem preço"
     return e
 
+def data_summary(d):
+    """Resumo do lastData carregado — para conferir se os números do app batem com o arquivo."""
+    isarc = lambda i: "/CosmeticEnhancers/" in i.get("ItemType", "") or "Arcane" in i.get("ItemType", "")
+    raw, items = d.get("RawUpgrades", []), (catalog() or {}).get("items", {})
+    mods = [i for i in raw if not isarc(i) and "/Randomized/" not in i.get("ItemType", "")]
+    arcs = [i for i in raw if isarc(i)]
+    top = sorted(mods, key=lambda i: -i.get("ItemCount", 1))[:5]
+    nm = lambda t: (items.get(t) or {}).get("n") or t.rsplit("/", 1)[-1]
+    return {"mods_entries": len(mods), "mods_units": sum(i.get("ItemCount", 1) for i in mods),
+            "arcanes_entries": len(arcs), "arcanes_units": sum(i.get("ItemCount", 1) for i in arcs),
+            "raw_total": len(raw), "upgrades": len(d.get("Upgrades", [])),
+            "rivens": sum(1 for i in d.get("Upgrades", []) if "/Randomized/" in i.get("ItemType", "")),
+            "top": [{"name": nm(i["ItemType"]), "count": i.get("ItemCount", 1)} for i in top]}
+
+
+def _record_summary(d, ts):
+    f = BASE / "data" / "summaries.json"
+    try:
+        h = json.loads(f.read_text(encoding="utf-8"))
+    except Exception:
+        h = []
+    h.append({"ts": ts, "s": data_summary(d)})
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(json.dumps(h[-6:]), encoding="utf-8")
+
+
+def _summaries():
+    try:
+        return json.loads((BASE / "data" / "summaries.json").read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
 def inventory(d, cat):
     if cat == "archon":
         return archon_inv(d)
@@ -497,11 +530,11 @@ def inventory(d, cat):
         # Uma linha por mod. Sem rank (estoque) e ranqueados ficam juntos na mesma entrada; a tela decide o que mostrar.
         raw, ranked = {}, {}
         for i in d.get("RawUpgrades", []):
-            if not isarc(i):
+            if not isarc(i) and "/Randomized/" not in i.get("ItemType", ""):   # Rivens têm aba própria
                 raw[i["ItemType"]] = raw.get(i["ItemType"], 0) + i.get("ItemCount", 1)
         for i in d.get("Upgrades", []):
             t = i.get("ItemType", "")
-            if "/Upgrades/Mods/" not in t:
+            if "/Upgrades/Mods/" not in t or "/Randomized/" in t:
                 continue
             try:
                 lvl = int(json.loads(i.get("UpgradeFingerprint") or "{}").get("lvl", 0))
@@ -1126,6 +1159,10 @@ class H(SimpleHTTPRequestHandler):
                 if pid:
                     auth.set_player_id(sess, pid)
                 ts = auth.save_data(sess, body)
+                try:
+                    _record_summary(auth.load_data(dict(sess, uploaded_at=ts)), ts)
+                except Exception as e:
+                    print("resumo:", e)
                 return self.send_json({"ok": True, "uploaded_at": ts})
             j = json.loads(body.decode("utf-8") or "{}") if body else {}
             if u.path == "/api/data/delete":
@@ -1140,6 +1177,13 @@ class H(SimpleHTTPRequestHandler):
                     return self.send_json({"error": "Senha incorreta."}, 401)
                 auth.delete_account(sess["key"])
                 return self.send_json({"ok": True}, headers=[("Set-Cookie", "wfsid=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax")])
+            if u.path == "/api/settings":
+                try:
+                    return self.send_json(settings.update(j))
+                except ValueError as e:
+                    return self.send_json({"error": str(e)}, 400)
+            if u.path == "/api/market/refresh":
+                return self.send_json({"ok": True, "queued": market.refresh_all()})
             if u.path.startswith("/api/wfm/"):
                 try:
                     return self.send_json(wfmacct.handle_post(u.path, j))
@@ -1223,6 +1267,8 @@ class H(SimpleHTTPRequestHandler):
                 return self.send_json(res)
             except wfmacct.WfmError as e:
                 return self.send_json({"error": str(e)}, e.code)
+        if u.path == "/api/settings":
+            return self.send_json(dict(settings.get(), cached=market.info()["cached"]))
         if u.path == "/api/effects":
             e, st = effects.get(q.get("p", [""])[0])
             return self.send_json({"status": st, "e": e})
@@ -1232,6 +1278,8 @@ class H(SimpleHTTPRequestHandler):
                 return self.send_json({"error": "nodata"}, 409)
             if u.path == "/api/summary":
                 return self.send_json(summary(d))
+            if u.path == "/api/data/summary":
+                return self.send_json({"now": data_summary(d), "uploaded_at": sess.get("uploaded_at"), "history": _summaries()})
             if u.path == "/api/rivens":
                 return self.send_json(rivens.decode(d, (catalog() or {}).get("items", {}), icon_of))
             cat = q.get("cat", [""])[0]

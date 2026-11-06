@@ -6,7 +6,8 @@
 - Índice de itens (slug/gameRef) vem de /v2/items e fica em cache por 7 dias (data/market_index.json).
 - Preço de cada item = menor venda de jogador online/in-game (e maior compra), cache em data/market_cache.json.
 - Todas as chamadas passam por um limitador global (~2,5 req/s, o limite do site é 3/s)."""
-import heapq, itertools, json, os, re, threading, time, urllib.request, urllib.error
+import settings
+import heapq, itertools, json, os, re, shutil, threading, time, urllib.request, urllib.error
 from pathlib import Path
 
 BASE = Path(os.environ.get("WF_HOME") or Path(__file__).parent)
@@ -17,7 +18,14 @@ API2 = "https://api.warframe.market/v2"
 API1 = "https://api.warframe.market/v1"
 HEAD = {"Accept": "application/json", "Language": "en", "Platform": "pc", "Crossplay": "true",
         "User-Agent": "warframe-profile-local/1.0"}
-DAY = 24 * 3600          # cada preço é renovado no máximo 1x por dia
+DAY = 24 * 3600          # padrão; o valor real vem de settings (price_ttl_h)
+
+
+def _ttl():
+    try:
+        return max(1, int(settings.get("price_ttl_h") or 24)) * 3600
+    except Exception:
+        return DAY
 MAX_QUEUE = 6000
 MAX_BATCH = 80
 INDEX_TTL = 7 * 86400
@@ -47,32 +55,40 @@ def _http(url):
             _last[0] = time.time()
 
 
+_bak = [0.0]
+
+
 def _read(p):
+    """Lê o JSON; se o arquivo estiver corrompido/vazio (app encerrado no meio da gravação), usa o .bak."""
+    for q in (p, p.with_name(p.name + ".bak")):
+        try:
+            v = json.loads(q.read_text(encoding="utf-8"))
+            if v:
+                return v
+        except Exception:
+            pass
+    return None
+
+
+def _write(p, obj, backup=False):
+    """Gravação atômica (arquivo temporário + rename): nunca deixa o cache pela metade."""
     try:
-        return json.loads(p.read_text(encoding="utf-8"))
-    except Exception:
-        return None
-
-
-def _write(p, obj):
-    try:
-        DATA.mkdir(exist_ok=True)
-        p.write_text(json.dumps(obj, ensure_ascii=False), encoding="utf-8")
-    except Exception:
-        pass
-
-
-def _build(items):
-    by_ref, slugs = {}, {}
-    for it in items:
-        sl = it.get("slug")
-        if not sl:
-            continue
-        slugs[sl] = {"max": it.get("maxRank")}
-        ref = it.get("gameRef")
-        if ref:
-            by_ref[ref] = sl
-    return by_ref, slugs
+        DATA.mkdir(parents=True, exist_ok=True)
+        if backup and p.exists() and time.time() - _bak[0] > 600:
+            try:
+                if json.loads(p.read_text(encoding="utf-8")):
+                    shutil.copyfile(p, p.with_name(p.name + ".bak"))
+                    _bak[0] = time.time()
+            except Exception:
+                pass
+        tmp = p.with_name(p.name + ".tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(json.dumps(obj, ensure_ascii=False))
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, p)
+    except Exception as e:
+        print("market: falha ao gravar", p.name, e)
 
 
 def load_index(force=False):
@@ -142,7 +158,7 @@ def _prices():
 def _save(force=False):
     if force or time.time() - _state["saved"] > 8:
         _state["saved"] = time.time()
-        _write(CACHE_FILE, {"meta": _meta, "prices": _prices()})
+        _write(CACHE_FILE, {"meta": _meta, "prices": _prices()}, backup=True)
 
 
 def _orders(slug):
@@ -261,10 +277,11 @@ def _maybe_sweep():
     now = time.time()
     with _mem:
         P = _prices()
-        if now - _meta.get("last_sweep", 0) < DAY:
+        if now - _meta.get("last_sweep", 0) < 600:
             return
         _meta["last_sweep"] = now
-        stale = [k for k, e in P.items() if now - e.get("ts", 0) > DAY]
+        ttl = _ttl()
+        stale = [k for k, e in P.items() if now - e.get("ts", 0) > ttl]
         _save(True)
     for k in stale:
         _enqueue(k, 2)
@@ -292,7 +309,7 @@ def batch(keys, prio=0):
                 continue
             e = P.get(k)
             if e:
-                stale = now - e.get("ts", 0) > DAY
+                stale = now - e.get("ts", 0) > _ttl()
                 out[k] = dict(e, stale=stale)
                 if stale:
                     _enqueue(k, prio)
@@ -304,6 +321,17 @@ def batch(keys, prio=0):
             _enqueue(k, prio)
             out[k] = {"pending": True}
     return out
+
+
+def refresh_all():
+    """Renova TODOS os preços guardados, em segundo plano. Os valores antigos continuam valendo até serem trocados."""
+    start()
+    with _mem:
+        keys = list(_prices().keys())
+        _meta["last_sweep"] = time.time()
+    for k in keys:
+        _enqueue(k, 2)
+    return len(keys)
 
 
 def info():

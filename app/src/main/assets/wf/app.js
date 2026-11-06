@@ -71,6 +71,7 @@ const NAV = [
   ["mercado", "Mercado", '<path d="M3 9l2-5h14l2 5"/><path d="M4 9v11h16V9"/><path d="M9 20v-6h6v6"/>'],
   ["sindicatos", "Sindicatos", '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-4 3-6 6-6s6 2 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14c3 0 5 2 5 5"/>'],
   ["missoes", "Missões", '<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>'],
+  ["config", "Configurações", '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>'],
 ];
 
 const ico = (src, name) => `<div class="ico">${src ? `<img loading="lazy" src="${src}" alt="" data-l="${esc((name || "?")[0])}" onerror="imgFail(this)">` : `<span class="mono-l">${esc((name || "?")[0])}</span>`}</div>`;
@@ -474,6 +475,7 @@ const buyOf = x => { const p = x.slug && MK.cache[mkKey(x)]; return p && !p.none
 const valueOf = x => x.parts ? x.parts.reduce((a, y) => a + (unitOf(y) ?? 0) * y.count, 0) : (unitOf(x) ?? 0) * ((x.vc ?? x.count) || 0);
 
 VIEWS.inventario = async el => {
+  jf("/api/settings").then(x => { window.SET = x; }).catch(() => { });
   const tabs = [["resources", "Recursos"], ["mods", "Mods"], ["arcanes", "Arcanos"], ["archon", "Archon Shards"], ["relics", "Relíquias"], ["primeparts", "Prime parts"], ["primesets", "Prime sets"], ["blueprints", "Blueprints"], ["consumables", "Consumíveis"], ["cosmetics", "Cosméticos"], ["skins", "Skins"]];
   const PRICED = new Set(["mods", "arcanes", "archon", "relics", "primeparts", "primesets"]);
   let cat = "resources", list = [], q = "", sort = "count", shown = 60, filtered = [], only = new Set(), open = new Set(), tok = ++MK.tok;
@@ -534,7 +536,7 @@ VIEWS.inventario = async el => {
     const noIdx = priced() && view.length && !view.some(x => x.slug);
     $("#mkbar").innerHTML = !priced() ? "" :
       `${MK.err ? `<div class="mkerr">${esc(MK.err)}</div>` : ""}${noIdx ? '<div class="mkerr">Nenhum item deste grupo foi encontrado no warframe.market.</div>' : ""}
-       <div class="mkrow"><span class="mut">${pend ? `Buscando ${fmt(pend)} preços em segundo plano…` : "Preços carregados"} · atualizados 1 vez por dia</span></div>`;
+       <div class="mkrow"><span class="mut">${pend ? `Buscando ${fmt(pend)} preços em segundo plano…` : "Preços carregados"}${(() => { const n = list.filter(x => x.slug && MK.cache[mkKey(x)] && MK.cache[mkKey(x)].stale).length; return n ? ` · ${fmt(n)} sendo renovados (valor antigo mantido)` : ""; })()} · atualizados ${(() => { const h = (window.SET && SET.price_ttl_h) || 24; return h % 24 === 0 ? (h === 24 ? "1 vez por dia" : "a cada " + h / 24 + " dias") : "a cada " + h + " h"; })()}</span></div>`;
   };
   let tickT = 0;
   const tick = () => { clearTimeout(tickT); tickT = setTimeout(draw, 180); };
@@ -681,24 +683,35 @@ function showUpload(canCancel = false) {
 }
 
 let _ubT = 0;
-function renderUserBar() {
-  const el = $("#userbar"); clearInterval(_ubT);
+function renderUserBar(target) {
+  const el = target || $("#userbar"); clearInterval(_ubT);
+  if (!target && ME && ME.app) { el.innerHTML = ""; return; }
   if (!ME || !ME.authenticated || (!ME.auth && ME.kind !== "legacy")) { el.innerHTML = ""; return; }
   const visitor = ME.kind === "visitor", legacy = ME.kind === "legacy", isApp = !!ME.app;
   const fresh = () => { if (!ME.uploaded_at) return ""; const old = Date.now() / 1000 - ME.uploaded_at > 86400;
     return `<span class="chip ${old ? "gold" : "ok"}" title="${dtFmt(ME.uploaded_at)}">Dados de ${dtFmt(ME.uploaded_at)} · ${ago(ME.uploaded_at)}${old ? " · pode estar desatualizado" : ""}</span>`; };
   const paint = () => {
     if (visitor && ME.expires_at - Date.now() / 1000 <= 0) { location.reload(); return; }
-    $("#ub-info").innerHTML = ((legacy || isApp) ? "" : `<span class="chip cyan">${visitor ? "Visitante" : "👤 " + esc(ME.user)}</span>`) + fresh() +
+    const inf = $("#ub-info"); if (!inf) { clearInterval(_ubT); return; }
+    inf.innerHTML = ((legacy || isApp) ? "" : `<span class="chip cyan">${visitor ? "Visitante" : "👤 " + esc(ME.user)}</span>`) + fresh() +
       (visitor ? `<span class="chip gold">expira em ${left(ME.expires_at - Date.now() / 1000)} · nada fica salvo</span>` : "");
   };
   el.innerHTML = `<div class="ubar"><div class="chips" id="ub-info" style="margin:0"></div>${legacy ? "" : `<span class="sp"></span>
     <button class="pill" id="ub-up">Atualizar dados</button>${isApp ? "" : '<button class="pill" id="ub-out">Sair</button>'}
-    ${visitor ? "" : `<details class="umore"><summary class="pill">⋯</summary><div class="umenu"><button class="linklike" id="ub-del">Apagar meus dados</button>${isApp ? "" : '<button class="linklike danger" id="ub-acc">Excluir minha conta</button>'}</div></details>`}`}</div>`;
+    ${visitor ? "" : `<details class="umore"><summary class="pill">⋯</summary><div class="umenu"><button class="linklike" id="ub-sum">Resumo dos dados</button><button class="linklike" id="ub-del">Apagar meus dados</button>${isApp ? "" : '<button class="linklike danger" id="ub-acc">Excluir minha conta</button>'}</div></details>`}`}</div>`;
   paint(); _ubT = setInterval(paint, 30000);
   if (legacy) return;
   $("#ub-up").onclick = () => showUpload(true);
   const outb = $("#ub-out"); if (outb) outb.onclick = async () => { await post("/api/auth/logout").catch(() => {}); location.reload(); };
+  const sm = $("#ub-sum"); if (sm) sm.onclick = async () => {
+    openModal('<h2 style="font-size:20px">Resumo dos dados</h2><div id="sumb" class="fx"><div class="empty">Carregando…</div></div>');
+    try {
+      const r = await jf("/api/data/summary"), f = s => `<div class="fxr"><b>${esc(s.when || "agora")}</b><div>Mods: <b>${fmt(s.s.mods_entries)}</b> entradas · <b>${fmt(s.s.mods_units)}</b> unidades<br>Arcanos: ${fmt(s.s.arcanes_entries)} entradas · ${fmt(s.s.arcanes_units)} unidades<br>RawUpgrades: ${fmt(s.s.raw_total)} · Upgrades: ${fmt(s.s.upgrades)} · Rivens: ${fmt(s.s.rivens)}<br><small class="mut">Mais numerosos: ${s.s.top.map(t => esc(t.name) + " ×" + fmt(t.count)).join(", ")}</small></div></div>`;
+      const dt = t => new Date(t * 1000).toLocaleString("pt-BR");
+      $("#sumb").innerHTML = f({ when: "Arquivo carregado agora (" + dt(r.uploaded_at) + ")", s: r.now }) + (r.history.length > 1 ? '<div class="mut" style="margin-top:10px">Envios anteriores</div>' + r.history.slice(0, -1).reverse().map(h => f({ when: dt(h.ts), s: h.s })).join("") : "") +
+        '<div class="mut" style="font-size:12px;margin-top:10px">Esses números vêm direto do arquivo. Se aqui já aparece o valor alto, o lastData enviado realmente tem essa quantidade.</div>';
+    } catch (e) { $("#sumb").innerHTML = `<div class="mkerr">${esc(e.message)}</div>`; }
+  };
   const del = $("#ub-del"); if (del) del.onclick = async () => { if (confirm("Apagar o seu lastData salvo? A conta continua existindo.")) { await post("/api/data/delete"); location.reload(); } };
   const acc = $("#ub-acc"); if (acc) acc.onclick = async () => { const pw = prompt("Para excluir a conta e todos os dados, digite a sua senha:"); if (pw) { try { await post("/api/account/delete", { password: pw }); location.reload(); } catch (e) { alert(e.message); } } };
 }
@@ -885,3 +898,41 @@ VIEWS.mercado = async el => {
   }
   setTimeout(tick, 10000); setInterval(tick, 60000);
 })();
+
+/* ================================================================ CONFIGURAÇÕES */
+VIEWS.config = async el => {
+  const S = await jf("/api/settings"), ps = await jf("/api/market/status").catch(() => ({})), me = await jf("/api/wfm/status").catch(() => ({}));
+  window.SET = S;
+  const TTL = [[3, "3 horas"], [6, "6 horas"], [12, "12 horas"], [24, "24 horas (padrão)"], [72, "3 dias"], [168, "7 dias"]];
+  const PRES = [["online", "Online"], ["ingame", "Em jogo"], ["invisible", "Invisível"], ["", "Desligado"]];
+  el.innerHTML = `${head("Configurações", "Dados do jogo, preços e perfil do mercado")}
+    <div class="sec"><h2>Dados do jogo</h2></div><div class="mbox" id="cfg-data"></div>
+    <div class="sec"><h2>Preços do warframe.market</h2></div>
+    <div class="mbox"><label class="cfl">Renovar os preços a cada</label>
+      <select class="inp" id="cf-ttl">${TTL.map(([h, l]) => `<option value="${h}" ${h === S.price_ttl_h ? "selected" : ""}>${l}</option>`).join("")}${TTL.some(t => t[0] === S.price_ttl_h) ? "" : `<option value="${S.price_ttl_h}" selected>${S.price_ttl_h} h</option>`}</select>
+      <div class="mut cfh">Menos tempo = preços mais frescos, mas mais consultas ao site. O valor antigo continua na tela enquanto é renovado.</div>
+      <div class="mut cfh" id="cf-pinfo">${fmt(S.cached || 0)} preços guardados${ps.queue ? " · " + fmt(ps.queue) + " na fila" : ""}</div>
+      <button class="pill" id="cf-refresh">Atualizar todos agora</button><span class="mut" id="cf-rmsg" style="margin-left:8px"></span></div>
+    <div class="sec"><h2>Perfil do mercado</h2></div>
+    <div class="mbox">${me.logged ? `<label class="cfl">Status (como em ${esc(me.user.name)})</label>
+      <div class="tabs" id="cf-pres">${PRES.map(([v, l]) => `<span class="pill ${v === (S.wfm_status || "") ? "on" : ""}" data-v="${v}">${l}</span>`).join("")}</div>
+      <div class="mut cfh" id="cf-pst"></div>
+      <div class="mut cfh">O app mantém a conexão aberta e renova o status sozinho enquanto estiver aberto ou em segundo plano. Se o Android encerrar o app, o status cai.</div>` : '<div class="mut">Entre na sua conta na aba <b>Mercado</b> para controlar o status.</div>'}</div>
+    <div class="mut" style="font-size:12px;margin:14px 0">App ${esc(APP_VERSION)}</div>`;
+  renderUserBar($("#cfg-data"));
+  $("#cf-ttl").onchange = async e => { try { await post("/api/settings", { price_ttl_h: +e.target.value }); window.SET.price_ttl_h = +e.target.value; } catch (er) { alert(er.message); } };
+  $("#cf-refresh").onclick = async () => { try { const r = await post("/api/market/refresh"); $("#cf-rmsg").textContent = `${fmt(r.queued)} preços na fila de renovação`; } catch (er) { $("#cf-rmsg").textContent = er.message; } };
+  if (me.logged) {
+    const show = async () => { try { const w = await jf("/api/wfm/presence"), n = { online: "Online", ingame: "Em jogo", invisible: "Invisível" };
+      const b = $("#cf-pst"); if (!b) return false;
+      b.textContent = !w.desired ? "Desligado (o app não controla o status)." : w.err ? "Erro: " + w.err : w.authed ? `Conectado${w.last ? " · status confirmado: " + (n[w.last] || w.last) : " · aguardando confirmação…"}` : w.connected ? "Autenticando…" : "Conectando…";
+      return !!w.desired && !w.err && !(w.authed && w.last === w.desired); } catch { return false; } };
+    $("#cf-pres").onclick = async e => {
+      const t = e.target.closest(".pill"); if (!t) return;
+      try { await post("/api/wfm/presence", { status: t.dataset.v }); $$("#cf-pres .pill").forEach(x => x.classList.toggle("on", x === t)); }
+      catch (er) { $("#cf-pst").textContent = er.message; return; }
+      for (let i = 0; i < 8 && await show(); i++) await sleep(1500);
+    };
+    show();
+  }
+};

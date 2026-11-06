@@ -12,6 +12,11 @@ def start(home, token):
     os.environ["WF_APP"] = "1"
     os.environ["WF_TOKEN"] = token
     import server
+    try:
+        import wfmws
+        wfmws.autostart()
+    except Exception as e:
+        print('presença:', e)
     from http.server import ThreadingHTTPServer
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.H)
     httpd.daemon_threads = True
